@@ -5,7 +5,7 @@
 
 ```bash
 $ cd myProject/
-$ npm install bookshelf-cache-redis
+$ npm install bookshelf-cache-redis --save
 ```
 
 ## Usage
