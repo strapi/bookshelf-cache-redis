@@ -64,12 +64,15 @@ module.exports = (bookshelf, settings) => {
    */
 
   // Generic function to override default fetch methods.
-  function retrieveCache (options, method) {
-    const serial = options.hasOwnProperty('serial') ? options.serial : '';
+  async function retrieveCache (options, method) {
+    const serial = options.hasOwnProperty('serial') ? options.serial : undefined;
     delete options.serial;
 
-    if (serial) {
-      return this.constructor.forge()[method](options);
+    if (!serial || disabled === true) {
+      return await this.constructor.forge()[method](options)
+        .then(data => {
+          return data.toJSON();
+        });
     }
 
     return redis.get(serial)
@@ -92,9 +95,13 @@ module.exports = (bookshelf, settings) => {
 
   // Destructuring settings.
   const { instance: redis } = settings;
+  let disabled = false;
 
   // Disable plugin if there is no Redis instance.
-  if (redis && redis.constructor.name !== 'Redis') {
+  if (settings.hasOwnProperty('disabled') && settings.disabled === true) {
+    disabled = true;
+    strapi.log.warn('The plugin has been loaded but he is disabled.');
+  } else if (redis && redis.constructor.name !== 'Redis') {
     return strapi.log.error('You need to specify a Redis instance object.');
   }
 
@@ -110,6 +117,22 @@ module.exports = (bookshelf, settings) => {
     return fetchAllCache.apply(this.model.forge(), ...args);
   };
 
+
+
+  bookshelf.Model.prototype.fetchPageCache = function (options) {
+    return retrieveCache.apply(this, [options, 'fetchPage']);
+  }
+
+  bookshelf.Model.fetchPageCache = function (...args) {
+    return this.forge().retrieveCache(...args, 'fetchPage');
+  }
+
+  bookshelf.Collection.prototype.fetchPageCache = function (...args) {
+    return retrieveCache.apply(this.model.forge(), ...args);
+  };
+
+
+
   bookshelf.Model.prototype.fetchCache = function (options) {
     return retrieveCache.apply(this, [options, 'fetch']);
   }
@@ -121,4 +144,15 @@ module.exports = (bookshelf, settings) => {
   bookshelf.Collection.prototype.fetchCache = function (...args) {
     return fetchCache.apply(this.model.forge(), ...args);
   };
+
+
+  bookshelf.Model.prototype.cache = function () {
+    console.log(this);
+    return this;
+  }
+
+  bookshelf.Model.cache = function (...args) {
+    console.log(this);
+    return this;
+  }
 };
