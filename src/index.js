@@ -69,27 +69,26 @@ module.exports = (bookshelf, settings) => {
     delete options.serial;
 
     if (!serial || disabled === true) {
-      return await this.constructor.forge()[method](options)
-        .then(data => {
-          return data.toJSON();
-        });
+      return await this[method](options);
     }
 
     return redis.get(serial)
       .then(async result => {
         if (result === null) {
-          const cache = await this.constructor.forge()[method](options)
-            .then(data => {
-              return data.toJSON();
-            })
+          const cache = await this[method](options)
+            .then(data => data.toJSON());
 
           // Store record
           redis.set(serial, JSON.stringify(cache));
 
-          return cache;
+          return ({
+            toJSON: () => cache
+          });
         }
 
-        return JSON.parse(result);
+        return ({
+          toJSON: () => JSON.parse(result)
+        });
       });
   }
 
@@ -144,15 +143,4 @@ module.exports = (bookshelf, settings) => {
   bookshelf.Collection.prototype.fetchCache = function (...args) {
     return fetchCache.apply(this.model.forge(), ...args);
   };
-
-
-  bookshelf.Model.prototype.cache = function () {
-    console.log(this);
-    return this;
-  }
-
-  bookshelf.Model.cache = function (...args) {
-    console.log(this);
-    return this;
-  }
 };
