@@ -26,7 +26,6 @@
  */
 
 module.exports = (bookshelf, settings) => {
-
   /**
    * @method Model#retrieveCache
    * @belongsTo Model
@@ -64,32 +63,37 @@ module.exports = (bookshelf, settings) => {
    */
 
   // Generic function to override default fetch methods.
-  async function retrieveCache (options, method) {
-    const serial = options.hasOwnProperty('serial') ? options.serial : undefined;
+  async function retrieveCache(options, method) {
+    const serial = options.hasOwnProperty('serial')
+      ? options.serial
+      : undefined;
+    const expired = options.hasOwnProperty('expired')
+      ? options.expired
+      : 60 * 60; // Default expiration time to 1 hour.
+
     delete options.serial;
+    delete options.expired;
 
     if (!serial || disabled === true) {
       return await this[method](options);
     }
 
-    return redis.get(serial)
-      .then(async result => {
-        if (result === null) {
-          const cache = await this[method](options)
-            .then(data => data.toJSON());
+    return redis.get(serial).then(async result => {
+      if (result === null) {
+        const cache = await this[method](options).then(data => data.toJSON());
 
-          // Store record
-          redis.set(serial, JSON.stringify(cache));
+        // Store record
+        redis.set(serial, JSON.stringify(cache), 'ex', expired);
 
-          return ({
-            toJSON: () => cache
-          });
-        }
+        return {
+          toJSON: () => cache
+        };
+      }
 
-        return ({
-          toJSON: () => JSON.parse(result)
-        });
-      });
+      return {
+        toJSON: () => JSON.parse(result)
+      };
+    });
   }
 
   // Destructuring settings.
@@ -104,43 +108,39 @@ module.exports = (bookshelf, settings) => {
     return strapi.log.error('You need to specify a Redis instance object.');
   }
 
-  bookshelf.Model.prototype.fetchAllCache = function (options) {
+  bookshelf.Model.prototype.fetchAllCache = function(options) {
     return retrieveCache.apply(this, [options, 'fetchAll']);
-  }
+  };
 
-  bookshelf.Model.fetchAllCache = function (...args) {
+  bookshelf.Model.fetchAllCache = function(...args) {
     return this.forge().retrieveCache(...args, 'fetchAll');
-  }
+  };
 
-  bookshelf.Collection.prototype.fetchAllCache = function (...args) {
+  bookshelf.Collection.prototype.fetchAllCache = function(...args) {
     return fetchAllCache.apply(this.model.forge(), ...args);
   };
 
-
-
-  bookshelf.Model.prototype.fetchPageCache = function (options) {
+  bookshelf.Model.prototype.fetchPageCache = function(options) {
     return retrieveCache.apply(this, [options, 'fetchPage']);
-  }
+  };
 
-  bookshelf.Model.fetchPageCache = function (...args) {
+  bookshelf.Model.fetchPageCache = function(...args) {
     return this.forge().retrieveCache(...args, 'fetchPage');
-  }
+  };
 
-  bookshelf.Collection.prototype.fetchPageCache = function (...args) {
+  bookshelf.Collection.prototype.fetchPageCache = function(...args) {
     return retrieveCache.apply(this.model.forge(), ...args);
   };
 
-
-
-  bookshelf.Model.prototype.fetchCache = function (options) {
+  bookshelf.Model.prototype.fetchCache = function(options) {
     return retrieveCache.apply(this, [options, 'fetch']);
-  }
+  };
 
-  bookshelf.Model.fetchCache = function (...args) {
+  bookshelf.Model.fetchCache = function(...args) {
     return this.forge().retrieveCache(...args, 'fetch');
-  }
+  };
 
-  bookshelf.Collection.prototype.fetchCache = function (...args) {
+  bookshelf.Collection.prototype.fetchCache = function(...args) {
     return fetchCache.apply(this.model.forge(), ...args);
   };
 };
