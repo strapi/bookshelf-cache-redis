@@ -80,7 +80,7 @@ module.exports = (bookshelf, settings) => {
 
     return redis.get(serial).then(async result => {
       if (result === null) {
-        const cache = await this[method](options).then(data => data.toJSON());
+        const cache = await this[method](options).then(data => data === null ? null : data.toJSON());
 
         // Store record
         redis.set(serial, JSON.stringify(cache), 'ex', expired);
